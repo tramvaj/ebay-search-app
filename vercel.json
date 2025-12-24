@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "app/api/ebay/search/route.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
-}
+{}
