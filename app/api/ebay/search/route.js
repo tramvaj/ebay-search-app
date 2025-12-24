@@ -1,9 +1,10 @@
+// Path: app/api/ebay/search/route.js
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// -------- eBay endpoints --------
+// eBay endpoints
 function getEbayUrls() {
   const env = (process.env.EBAY_ENV || "PROD").toUpperCase();
   const isSandbox = env === "SANDBOX";
@@ -22,7 +23,7 @@ function base64(str) {
   return Buffer.from(str, "utf8").toString("base64");
 }
 
-// Simple in-memory token cache (helps when the function stays warm)
+// In-memory token cache (helps when the function stays warm)
 let cachedToken = null;
 let cachedTokenExpiresAtMs = 0;
 
@@ -75,7 +76,6 @@ function buildSearchUrl(queryParams) {
   for (const [k, v] of Object.entries(queryParams || {})) {
     if (v === undefined || v === null) continue;
 
-    // Allow users to pass arrays (we join with commas, which matches how many eBay params are documented)
     if (Array.isArray(v)) {
       const joined = v.map((x) => String(x).trim()).filter(Boolean).join(",");
       if (joined) qs.set(k, joined);
@@ -87,7 +87,7 @@ function buildSearchUrl(queryParams) {
     qs.set(k, s);
   }
 
-  // Safe defaults
+  // Defaults if user leaves them blank
   if (!qs.get("q")) qs.set("q", "NASA Patches");
   if (!qs.get("sort")) qs.set("sort", "newlyListed");
 
@@ -95,7 +95,7 @@ function buildSearchUrl(queryParams) {
 }
 
 function pickEbayHeaders(clientHeaders) {
-  // Allowlist only. Users can set these from the UI.
+  // Allowlist only, so users cannot inject arbitrary headers
   const allowed = new Set([
     "x-ebay-c-marketplace-id",
     "x-ebay-c-enduserctx"
@@ -105,12 +105,13 @@ function pickEbayHeaders(clientHeaders) {
   for (const [k, v] of Object.entries(clientHeaders || {})) {
     const key = String(k).toLowerCase();
     if (!allowed.has(key)) continue;
+
     const val = String(v).trim();
     if (!val) continue;
+
     headers[key] = val;
   }
 
-  // Default marketplace if user does not specify
   if (!headers["x-ebay-c-marketplace-id"]) {
     headers["x-ebay-c-marketplace-id"] = "EBAY_US";
   }
@@ -121,13 +122,11 @@ function pickEbayHeaders(clientHeaders) {
 export async function POST(req) {
   try {
     const payload = await req.json().catch(() => ({}));
-
     const queryParams = payload?.queryParams || {};
     const clientHeaders = payload?.headers || {};
 
     const requestUrl = buildSearchUrl(queryParams);
     const token = await getAppAccessToken();
-
     const ebayHeaders = pickEbayHeaders(clientHeaders);
 
     const ebayResp = await fetch(requestUrl, {
@@ -156,7 +155,6 @@ export async function POST(req) {
         data
       },
       {
-        // Forward eBay status code so the client can react (429, 400, etc.)
         status: ebayResp.status,
         headers: { "Cache-Control": "no-store" }
       }
