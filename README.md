@@ -8,7 +8,7 @@ Defaults:
 - sort: `newlyListed`
 
 The UI lets users:
-- Set the common parameters via dropdowns or inputs
+- Set common parameters via dropdowns or inputs
 - Add any extra query params as free form key/value pairs
 - Set key headers like marketplace
 
@@ -21,6 +21,15 @@ Set these in Vercel Project Settings - Environment Variables:
 - `EBAY_CLIENT_ID`
 - `EBAY_CLIENT_SECRET`
 - `EBAY_ENV` (optional) - `PROD` or `SANDBOX` (defaults to PROD)
+
+## Vercel config note
+
+This repo includes a `vercel.json` that is intentionally just `{}`.
+Reason:
+- Older or incorrect function runtime entries can cause a build error like "Function Runtimes must have a valid version"
+- Node is pinned using `package.json` `engines.node` instead
+
+If you ever see that runtime error again, keep `vercel.json` empty and adjust `engines.node`.
 
 ## Manual upload workflow (no local git)
 
@@ -64,5 +73,7 @@ Headers supported in the UI:
 
 After deploy, open the site and click Search.
 You should see results for NASA Patches, newest first.
-If you get 401 or 403, confirm your eBay keys and that they are set in Vercel.
-If you get 429, you are rate limited - reduce refresh frequency or add caching.
+
+If you get:
+- 401 or 403: confirm your eBay keys are correct and set in Vercel
+- 429: you are rate limited, reduce refresh frequency
