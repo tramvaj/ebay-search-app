@@ -1,59 +1,68 @@
-# eBay keyword search (Browse API) - NASA Patches
+# eBay Browse API search - NASA Patches
 
-A small Next.js app you can deploy on Vercel that searches eBay using the Buy Browse API endpoint:
-- `GET /buy/browse/v1/item_summary/search`
+Next.js app for Vercel that searches eBay using:
+- Buy Browse API: `GET /buy/browse/v1/item_summary/search`
 
 Defaults:
-- keyword: `NASA Patches`
+- q: `NASA Patches`
 - sort: `newlyListed`
 
-UI goals:
-- Users can set every official query parameter for `item_summary/search`:
-  - `q`, `gtin`, `charity_ids`, `fieldgroups`, `compatibility_filter`, `auto_correct`, `category_ids`, `filter`, `sort`, `limit`, `offset`, `aspect_filter`, `epid`
-- Users can also add any extra query params as free form key/value pairs
-- Dropdowns are used where the API has clear enumerations (marketplaceId, sort, fieldgroups, auto_correct)
+The UI lets users:
+- Set the common parameters via dropdowns or inputs
+- Add any extra query params as free form key/value pairs
+- Set key headers like marketplace
 
-The app calls your own Next.js API route which:
-- mints an Application access token (OAuth client credentials grant)
-- forwards the request to eBay with your token
-- returns the JSON to the browser
+All eBay calls happen server side via `/api/ebay/search` so your client secret never reaches the browser.
 
-## 1) Create eBay keys
-In the eBay Developer portal, create an app and get:
-- Client ID
-- Client Secret
+## Environment variables
 
-You will put these in Vercel Environment Variables (server side only).
+Set these in Vercel Project Settings - Environment Variables:
 
-## 2) Environment variables (Vercel)
-Set these in your Vercel Project Settings:
-- `EBAY_CLIENT_ID` = your client id
-- `EBAY_CLIENT_SECRET` = your client secret
-- `EBAY_ENV` = `PROD` or `SANDBOX` (defaults to PROD if missing)
+- `EBAY_CLIENT_ID`
+- `EBAY_CLIENT_SECRET`
+- `EBAY_ENV` (optional) - `PROD` or `SANDBOX` (defaults to PROD)
 
-Notes:
-- Production token endpoint: `https://api.ebay.com/identity/v1/oauth2/token`
-- Sandbox token endpoint: `https://api.sandbox.ebay.com/identity/v1/oauth2/token`
-- Browse search endpoint: `https://api.ebay.com/buy/browse/v1/item_summary/search`
+## Manual upload workflow (no local git)
 
-## 3) Run locally (optional)
-If you do run locally, create `.env.local` with the same variables, then:
-- `npm install`
-- `npm run dev`
+Option A - GitHub web upload:
+1. Create a new repo on GitHub
+2. Upload the project files using the GitHub web UI
+3. In Vercel, import the GitHub repo and deploy
+4. Add the environment variables in Vercel, then redeploy
 
-## 4) Deploy (no local git)
-If you do not use local git:
-1. Create a GitHub repo in the browser
-2. Upload the project files via the GitHub web UI
-3. In Vercel, import that GitHub repo, or use Vercel's "Deploy from GitHub"
+Option B - Vercel upload:
+1. Create a new Vercel project
+2. Upload the folder
+3. Add the environment variables
+4. Deploy
 
-## 5) Important eBay details (why the UI has certain fields)
-- Marketplace header `X-EBAY-C-MARKETPLACE-ID` is strongly recommended. If missing, eBay defaults to `EBAY_US`.
-- Sort options shown in the UI include: `newlyListed`, `endingSoonest`, `price`, `-price`, `distance` (best match is default when sort is omitted).
-- `limit` max is 200, default is 50.
-- `offset` must be 0 or a multiple of `limit`.
-- Only FIXED_PRICE items are returned by default unless you use a `buyingOptions` filter.
+## What the UI supports
 
-## 6) Security
-Client secret never ships to the browser.
-All eBay calls are made server side through `/api/ebay/search`.
+Official query params for `item_summary/search` are exposed as inputs, including:
+- `q`
+- `category_ids`
+- `filter`
+- `sort`
+- `limit`
+- `offset`
+- `fieldgroups`
+- `auto_correct`
+- `aspect_filter`
+- `compatibility_filter`
+- `epid`
+- `gtin`
+- `charity_ids`
+
+Plus:
+- Extra query params (free form) for anything else eBay accepts
+
+Headers supported in the UI:
+- `X-EBAY-C-MARKETPLACE-ID`
+- `X-EBAY-C-ENDUSERCTX` (optional, built from country and zip)
+
+## Quick sanity check
+
+After deploy, open the site and click Search.
+You should see results for NASA Patches, newest first.
+If you get 401 or 403, confirm your eBay keys and that they are set in Vercel.
+If you get 429, you are rate limited - reduce refresh frequency or add caching.
