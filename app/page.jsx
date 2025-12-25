@@ -64,9 +64,39 @@ const MARKETPLACE_IDS = [
   "EBAY_MOTORS_US"
 ];
 
+const BUYING_OPTIONS_PRESETS = [
+  { value: "", label: "(leave as is)" },
+  { value: "FIXED_PRICE", label: "Fixed price only" },
+  { value: "AUCTION", label: "Auction only" },
+  { value: "FIXED_PRICE|AUCTION", label: "Fixed price + Auction" }
+];
+
 function toggleInArray(arr, value) {
   if (arr.includes(value)) return arr.filter((x) => x !== value);
   return [...arr, value];
+}
+
+function normalizeSpaces(s) {
+  return String(s || "").replace(/\s+/g, " ").trim();
+}
+
+function filterHasBuyingOptions(filterStr) {
+  return /(^|,)\s*buyingOptions\s*:/.test(String(filterStr || ""));
+}
+
+function upsertBuyingOptionsFilter(filterStr, buyingOptionsValue) {
+  const base = normalizeSpaces(filterStr);
+  const v = String(buyingOptionsValue || "").trim();
+
+  if (!v) return base;
+
+  const bo = `buyingOptions:{${v}}`;
+
+  // If user already included buyingOptions in the filter input, do not override it.
+  if (filterHasBuyingOptions(base)) return base;
+
+  if (!base) return bo;
+  return `${bo},${base}`;
 }
 
 export default function Page() {
@@ -85,6 +115,9 @@ export default function Page() {
   const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
 
+  // Auctions support (implemented by injecting buyingOptions into filter when missing)
+  const [buyingOptionsPreset, setBuyingOptionsPreset] = useState("FIXED_PRICE|AUCTION");
+
   // Headers users can set
   const [marketplaceId, setMarketplaceId] = useState("EBAY_US");
 
@@ -92,7 +125,7 @@ export default function Page() {
   const [ctxCountry, setCtxCountry] = useState("US");
   const [ctxZip, setCtxZip] = useState("");
 
-  // Extra arbitrary query params (in case eBay adds more, or for experiments)
+  // Extra arbitrary query params
   const [extraParams, setExtraParams] = useState([{ key: "", value: "" }]);
 
   const [loading, setLoading] = useState(false);
@@ -116,8 +149,6 @@ export default function Page() {
     const zip = String(ctxZip || "").trim();
 
     if (country && zip) {
-      // eBay expects URL encoded packed header value
-      // Example: contextualLocation=country%3DUS%2Czip%3D19406
       const packed = `contextualLocation=${encodeURIComponent(`country=${country},zip=${zip}`)}`;
       h["X-EBAY-C-ENDUSERCTX"] = packed;
     }
@@ -125,10 +156,13 @@ export default function Page() {
     return h;
   }, [marketplaceId, ctxCountry, ctxZip]);
 
+  const effectiveFilter = useMemo(() => {
+    return upsertBuyingOptionsFilter(filter, buyingOptionsPreset);
+  }, [filter, buyingOptionsPreset]);
+
   const queryParams = useMemo(() => {
     const qp = {};
 
-    // Official params
     if (q) qp.q = q;
     if (gtin) qp.gtin = gtin;
     if (epid) qp.epid = epid;
@@ -137,7 +171,7 @@ export default function Page() {
     if (compatibilityFilter) qp.compatibility_filter = compatibilityFilter;
     if (autoCorrect) qp.auto_correct = autoCorrect;
     if (categoryIds) qp.category_ids = categoryIds;
-    if (filter) qp.filter = filter;
+    if (effectiveFilter) qp.filter = effectiveFilter;
     if (sort) qp.sort = sort;
 
     qp.limit = String(limit);
@@ -145,7 +179,6 @@ export default function Page() {
 
     if (aspectFilter) qp.aspect_filter = aspectFilter;
 
-    // Extra params
     for (const row of extraParams) {
       const k = String(row.key || "").trim();
       const v = String(row.value || "").trim();
@@ -163,7 +196,7 @@ export default function Page() {
     compatibilityFilter,
     autoCorrect,
     categoryIds,
-    filter,
+    effectiveFilter,
     sort,
     limit,
     offset,
@@ -286,7 +319,7 @@ export default function Page() {
           </div>
         </section>
 
-        <details style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
+        <details style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }} open>
           <summary style={{ cursor: "pointer", fontWeight: 650 }}>Official query params</summary>
 
           <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
@@ -361,14 +394,50 @@ export default function Page() {
               </label>
             </div>
 
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <label style={{ display: "grid", gap: 6 }}>
+                Buying options (auto adds to filter if missing)
+                <select
+                  value={buyingOptionsPreset}
+                  onChange={(e) => setBuyingOptionsPreset(e.target.value)}
+                  style={{ padding: 10, borderRadius: 10, border: "1px solid #ccc" }}
+                >
+                  {BUYING_OPTIONS_PRESETS.map((opt) => (
+                    <option key={opt.value || "leave"} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div style={{ display: "grid", gap: 6 }}>
+                Effective filter preview
+                <div
+                  style={{
+                    padding: 10,
+                    borderRadius: 10,
+                    border: "1px solid #ccc",
+                    background: "#fafafa",
+                    fontSize: 12,
+                    wordBreak: "break-word"
+                  }}
+                >
+                  {effectiveFilter || "(empty)"}
+                </div>
+              </div>
+            </div>
+
             <label style={{ display: "grid", gap: 6 }}>
               filter (Buy API Field Filters syntax)
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="Example: price:[10..50],buyingOptions:{FIXED_PRICE|AUCTION}"
+                placeholder="Example: price:[10..50],conditionIds:{1000}"
                 style={{ padding: 10, borderRadius: 10, border: "1px solid #ccc" }}
               />
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                If you already type buyingOptions:... here, the dropdown will not override it.
+              </div>
             </label>
 
             <label style={{ display: "grid", gap: 6 }}>
